@@ -1,0 +1,117 @@
+from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
+from datetime import datetime, timedelta
+import json
+import os
+
+app = Flask(__name__, static_folder='static')
+CORS(app)
+
+# ── Mock Database ──────────────────────────────────────────────────────────────
+student = {
+    "id": "00024725",
+    "name": "Kamilla Rakhimova",
+    "first_name": "Kamilla",
+    "email": "kamilla.kerimova998@gmail.com",
+    "program": "Bachelor of IT (Information Technologies)",
+    "year": 3,
+    "attendance": 13,
+    "average_mark": 73.4,
+    "avatar": "Riga Nordic University"
+}
+
+timetable = [
+    {"id": 1, "subject": "WEB technologies", "lecturer": "Amit Joshi", "room": "301", "day": "Thursday", "start": "14:45", "end": "17:00", "type": "Lecture"},
+    {"id": 2, "subject": "Software Development", "lecturer": "Roman Kopitovs", "room": "310", "day": "Thursday", "start": "16:00", "end": "18:00", "type": "Seminar"},
+    {"id": 3, "subject": "Statistics", "lecturer": "Aleksander Mrochko", "room": "201", "day": "Monday", "start": "10:00", "end": "12:00", "type": "Workshop"},
+    {"id": 4, "subject": "Relation DBMS Foundations", "lecturer": "Docent Samsins", "room": "305", "day": "Tuesday", "start": "09:00", "end": "11:00", "type": "Lecture"},
+    {"id": 5, "subject": "Java Development Fundamentals", "lecturer": "Amit Joshi", "room": "102", "day": "Wednesday", "start": "13:00", "end": "15:00", "type": "Lecture"},
+    {"id": 6, "subject": "Robotika", "lecturer": "Amit Joshi", "room": "308", "day": "Friday", "start": "11:00", "end": "13:00", "type": "Seminar"},
+]
+
+# ── Coursework ─────────────────────────────────────────────────────────────────
+coursework_deadlines = [
+    {"id": 1, "title": "CW 1", "subject": "WEB technologies", "type": "Coursework", "due": "2026-05-10", "status": "Passed", "grade": 75},
+    {"id": 2, "title": "Project Report", "subject": "Software Development", "type": "Coursework", "due": "2026-05-20", "status": "Upcoming", "grade": None},
+    {"id": 3, "title": "Statistics Assignment", "subject": "Statistics", "type": "Assignment", "due": "2026-05-25", "status": "Upcoming", "grade": None},
+    {"id": 4, "title": "Database Project", "subject": "Relation DBMS Foundations", "type": "Coursework", "due": "2026-06-01", "status": "Upcoming", "grade": None},
+]
+
+# ── Exams ──────────────────────────────────────────────────────────────────────
+exams = [
+    {"id": 1, "subject": "WEB technologies", "date": "2026-06-05", "start": "10:00", "end": "12:00", "room": "Room 301", "status": "Upcoming", "grade": None},
+    {"id": 2, "subject": "Software Development", "date": "2026-06-08", "start": "13:00", "end": "15:00", "room": "Room 310", "status": "Upcoming", "grade": None},
+    {"id": 3, "subject": "Statistics", "date": "2026-06-12", "start": "09:00", "end": "11:00", "room": "Room 201", "status": "Upcoming", "grade": None},
+    {"id": 4, "subject": "Java Development Fundamentals", "date": "2026-06-15", "start": "11:00", "end": "13:00", "room": "Room 102", "status": "Upcoming", "grade": None},
+]
+
+# ── Events ─────────────────────────────────────────────────────────────────────
+events = [
+    {"id": 1, "title": "IT Career Fair", "date": "2026-05-10", "time": "10:00", "location": "Main Hall", "category": "Career", "description": "Meet IT companies and recruiters."},
+    {"id": 2, "title": "Hackathon 2026", "date": "2026-05-15", "time": "09:00", "location": "Lab 1", "category": "Academic", "description": "24-hour coding competition."},
+    {"id": 3, "title": "Tech Meetup", "date": "2026-05-20", "time": "14:00", "location": "Conference Room", "category": "Social", "description": "Networking event for IT students."},
+    {"id": 4, "title": "AI Workshop", "date": "2026-05-25", "time": "11:00", "location": "Lab 3", "category": "Academic", "description": "Introduction to AI."},
+]
+
+# ── Academic Staff ─────────────────────────────────────────────────────────────
+academic_staff = [
+    {"id": 1, "name": "Amit Joshi", "module": "WEB technologies", "role": "Lecturer", "email": "amit.joshi@rnu.edu", "office": "301", "office_hours": "Thu 14:00-16:00"},
+    {"id": 2, "name": "Roman Kopitovs", "module": "Software Development", "role": "Lecturer", "email": "roman.kopitovs@rnu.edu", "office": "310", "office_hours": "Thu 16:00-18:00"},
+    {"id": 3, "name": "Aleksander Mrochko", "module": "Statistics", "role": "Lecturer", "email": "aleks.mrochko@rnu.edu", "office": "201", "office_hours": "Mon 10:00-12:00"},
+    {"id": 4, "name": "Docent Samsins", "module": "Relation DBMS Foundations", "role": "Lecturer", "email": "samsins@rnu.edu", "office": "305", "office_hours": "Tue 09:00-11:00"},
+    {"id": 5, "name": "Amit Joshi", "module": "Java Development Fundamentals", "role": "Lecturer", "email": "amit.joshi@rnu.edu", "office": "102", "office_hours": "Wed 13:00-15:00"},
+]
+
+# ── Dormitory ──────────────────────────────────────────────────────────────────
+dormitory_applications = [
+    {"id": 1, "room": "Block B, Room 204", "status": "Active", "start_date": "2025-09-01", "end_date": "2026-07-31", "rent": 450},
+]
+
+# ── Notifications ──────────────────────────────────────────────────────────────
+notifications = [
+    {"id": 1, "message": "Your Software Development project deadline is coming.", "type": "warning", "read": False, "time": "2 hours ago"},
+    {"id": 2, "message": "WEB technologies exam scheduled for June 5.", "type": "info", "read": False, "time": "1 day ago"},
+    {"id": 3, "message": "Attendance warning: below 20%.", "type": "danger", "read": True, "time": "3 days ago"},
+]
+
+# ── Routes ─────────────────────────────────────────────────────────────────────
+@app.route('/')
+def index():
+    return send_from_directory('static', 'index.html')
+
+@app.route('/api/student')
+def get_student():
+    return jsonify(student)
+
+@app.route('/api/timetable')
+def get_timetable():
+    return jsonify(timetable)
+
+@app.route('/api/deadlines')
+def get_deadlines():
+    return jsonify(coursework_deadlines)
+
+@app.route('/api/exams')
+def get_exams():
+    return jsonify(exams)
+
+@app.route('/api/events')
+def get_events():
+    return jsonify(events)
+
+@app.route('/api/staff')
+def get_staff():
+    return jsonify(academic_staff)
+
+@app.route('/api/dormitory')
+def get_dormitory():
+    return jsonify(dormitory_applications)
+
+@app.route('/api/notifications')
+def get_notifications():
+    return jsonify(notifications)
+
+# ── Run ────────────────────────────────────────────────────────────────────────
+if __name__ == '__main__':
+    os.makedirs('static', exist_ok=True)
+    app.run(debug=True, port=5000)
